@@ -83,9 +83,11 @@ Este protótipo não é o sistema final, mas **uma prova de conceito** que mostr
 ---
 
 ## 👨‍💻 Autores
-- Gustavo de Oliveira Turci Sandrini - 2TDSPW
-- Eduarda Tiemi Akami Machado - 2TDSPH
-- Felipe Pizzinato Bigatto Garcia - 2TDSPW
+| Nome Completo	    | RM    | Turma  |
+|-------------------|-------|--------|
+| Eduarda Tiemi	    |554756 | 2TDSPH |
+| Felipe Pizzinato	|555141 | 2TDSPW |
+| Gustavo Sandrini	|557505 | 2TDSPW |
 
 ---
 
