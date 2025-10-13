@@ -110,7 +110,7 @@ void loop() {
 
 {
   "version": 1,
-  "author": "Gustavo Dias",
+  "author": "Felipe Pizzinato",
   "editor": "wokwi",
   "parts": [
     { "type": "wokwi-breadboard", "id": "bb1", "top": 0, "left": -200, "attrs": {} },
