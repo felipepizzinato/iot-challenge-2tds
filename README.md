@@ -4,8 +4,6 @@
 A Mottu é uma das maiores empresas de aluguel de motos do Brasil, com presença também no México.  
 Um dos principais desafios operacionais é o gerenciamento das motos dentro dos pátios das filiais, garantindo organização, segurança e disponibilidade da frota.
 
-Este projeto foi desenvolvido como parte da disciplina **Disruptive Architectures: IoT, IoB & Generative AI (FIAP)**, com o objetivo de criar um protótipo funcional de **Internet das Coisas (IoT)** que simula esse gerenciamento.
-
 ---
 
 ## OBJETIVO
@@ -15,7 +13,7 @@ O protótipo demonstra como sensores e atuadores podem ser integrados para:
 - Alertar sobre mudanças de estado (moto em uso, moto parada, moto em posição incorreta).
 - Registrar informações de forma persistente (EEPROM).
 - Exibir dados em tempo real em um display LCD.
-- Enviar dados para a nuvem via Thinger.io e permitir controle remoto.
+- Enviar dados para a nuvem via Thinger.io e permitir monitoramento remoto.
 
 ---
 
@@ -34,7 +32,7 @@ O protótipo demonstra como sensores e atuadores podem ser integrados para:
 ## FUNCIONALIDADES
 
 ### 1. CONTROLE ON/OFF DO SISTEMA
-- Ao pressionar o botão físico ou acionar o painel do Thinger.io, o sistema alterna entre ligado e desligado.
+- Ao pressionar o botão físico, o sistema alterna entre ligado e desligado.
 - O estado é salvo na EEPROM e restaurado automaticamente ao reiniciar o ESP32.
 - LED e buzzer seguem o estado do sistema.
 
@@ -69,8 +67,7 @@ O painel web foi desenvolvido com os seguintes widgets:
 |--------|----------|--------|
 | Gauge | dht/temp | Exibe a temperatura ambiente (°C) |
 | Gauge | dht/hum | Exibe a umidade relativa do ar (%) |
-| On/Off State | state | Permite ligar/desligar o sistema remotamente |
-| LED Indicator | state | Mostra visualmente se o sistema está ativo (verde) ou inativo (vermelho) |
+| True/False State | state | Exobe se a moto está em uso ou não |
 
 O dashboard fornece uma visualização em tempo real do ambiente e do status da moto simulada.
 
