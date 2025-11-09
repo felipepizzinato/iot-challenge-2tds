@@ -129,4 +129,4 @@ Este protótipo é uma prova de conceito (PoC) que demonstra o potencial da IoT 
 ---
 
 ## RECURSOS
-- Vídeo de Apresentação: [https://youtu.be/-1XiyG2rE-o](https://youtu.be/wdqG8y8HZ_Q)
+- Vídeo de Apresentação: [https://youtu.be/-1XiyG2rE-o]
