@@ -1,66 +1,105 @@
-#include "DHT.h"
+#define THINGER_SERIAL_DEBUG
+#include <ThingerESP32.h>
+#include "DHTesp.h"
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
-#include <EEPROM.h>   // biblioteca para salvar estado
+#include <EEPROM.h>
 
-#define DHTPIN 2        
-#define DHTTYPE DHT22   
-#define LED_PIN 10
-#define BTN_PIN 11
-#define BUZZER_PIN 9
+// ==== Thinger.io ====
+#define USERNAME "felipepizzinato"
+#define DEVICE_ID "esp32_dht22"
+#define DEVICE_CREDENTIAL "372mZ15!zFYM_l7F"
 
-bool deviceState = false;         
-bool lastButton = HIGH;          
-unsigned long lastUpdate = 0;     
+// ==== Wi-Fi ====
+#define SSID "Wokwi-GUEST"
+#define SSID_PASSWORD ""
 
-DHT dht(DHTPIN, DHTTYPE);
+// ==== Pinos (ajustados para ESP32) ====
+#define DHT_PIN 15
+#define LED_PIN 26
+#define BTN_PIN 14
+#define BUZZER_PIN 27
+
+// ==== Objetos ====
+DHTesp dht;
 LiquidCrystal_I2C lcd(0x27, 16, 2);
+ThingerESP32 thing(USERNAME, DEVICE_ID, DEVICE_CREDENTIAL);
 
-// endereço na EEPROM para salvar estado
+// ==== Estado ====
+bool deviceState = false;
+bool lastButton = HIGH;
+unsigned long lastUpdate = 0;
 const int EEPROM_ADDR = 0;
 
-void setup() {
-  Serial.begin(9600);
+// ==== Variáveis de leitura ====
+float temp = 0.0;
+float hum  = 0.0;
 
-  pinMode(BTN_PIN, INPUT);   // botão com resistor físico
+void setup() {
+  Serial.begin(115200);
+  delay(200);
+
+  // === Wi-Fi e Thinger ===
+  thing.add_wifi(SSID, SSID_PASSWORD);
+  Serial.println("Conectando ao Thinger...");
+
+  // === Sensores e atuadores ===
   pinMode(LED_PIN, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
+  pinMode(BTN_PIN, INPUT_PULLUP); // botão com pullup interno
 
-  dht.begin();
-
+  dht.setup(DHT_PIN, DHTesp::DHT22);
   lcd.init();
   lcd.backlight();
 
-  // Recupera estado salvo na EEPROM
-  byte savedState = EEPROM.read(EEPROM_ADDR);
-  if (savedState == 1) {
-    deviceState = true;
-  } else {
-    deviceState = false;
-  }
+  EEPROM.begin(4);
+  deviceState = EEPROM.read(EEPROM_ADDR) == 1;
 
-  // Mostra status inicial no LCD
+  // === Recursos Thinger.io ===
+  thing["GPIO_26"] << digitalPin(LED_PIN);
+
+thing["dht"] >> [](pson &out){
+  out["temp"] = temp;
+  out["hum"]  = hum;
+};
+
+
+
+// WRITE: recebe do dashboard e aplica
+thing["state"] << [](pson &in){
+  if(!in.is_empty()){
+    deviceState = (bool) in;
+    EEPROM.write(EEPROM_ADDR, deviceState ? 1 : 0);
+    EEPROM.commit();
+
+    digitalWrite(LED_PIN, deviceState);
+    digitalWrite(BUZZER_PIN, deviceState);
+
+    Serial.print("Estado alterado via dashboard -> ");
+    Serial.println(deviceState ? "ON" : "OFF");
+  }
+};
+
+// READ: expõe o valor para widgets (Led Indicator, etc.)
+thing["state"] >> [](pson &out){
+  out = deviceState;
+};
+
+
+  lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("System ready!");
   delay(1000);
   lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Status:");
-  lcd.setCursor(8, 0);
-  lcd.print(deviceState ? "ON " : "OFF");
-
-  Serial.println("System ready!");
 }
 
 void loop() {
+  // === Botão (com debounce simples) ===
   int buttonValue = digitalRead(BTN_PIN);
-
   if (buttonValue == LOW && lastButton == HIGH) {
-    // alterna estado
     deviceState = !deviceState;
-
-    // salva na EEPROM
     EEPROM.write(EEPROM_ADDR, deviceState ? 1 : 0);
+    EEPROM.commit();
 
     Serial.print("Button pressed -> Status: ");
     Serial.println(deviceState ? "ON" : "OFF");
@@ -71,41 +110,45 @@ void loop() {
     lcd.setCursor(8, 0);
     lcd.print(deviceState ? "ON " : "OFF");
 
-    delay(200); // debounce
+    delay(200);
   }
-
   lastButton = buttonValue;
 
-  // Saídas
-  digitalWrite(LED_PIN, deviceState ? HIGH : LOW);
-  digitalWrite(BUZZER_PIN, deviceState ? HIGH : LOW);
+  // === Saídas físicas ===
+  digitalWrite(LED_PIN, deviceState);
+  digitalWrite(BUZZER_PIN, deviceState);
 
-  // leitura do DHT a cada 10s
+  // === Leitura do DHT a cada 10s ===
   if (millis() - lastUpdate >= 10000) {
     lastUpdate = millis();
 
-    float tempC = dht.readTemperature();
-    float hum = dht.readHumidity();
+    TempAndHumidity data = dht.getTempAndHumidity();
+    temp = data.temperature;
+    hum  = data.humidity;
 
-    if (isnan(tempC) || isnan(hum)) {
+    if (isnan(temp) || isnan(hum)) {
       Serial.println("Sensor error!");
       lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print("Read fail!");
     } else {
-      Serial.print("Temp: "); Serial.print(tempC); Serial.println(" C");
-      Serial.print("Humidity: "); Serial.print(hum); Serial.println(" %");
+      Serial.printf("Temp: %.1f °C | Umid: %.1f %%\n", temp, hum);
 
       lcd.clear();
       lcd.setCursor(0, 0);
-      lcd.print("T:"); lcd.print(tempC); lcd.print("C");
-
-      lcd.setCursor(0, 1);
-      lcd.print("H:"); lcd.print(hum); lcd.print("%");
+      lcd.print("T:");
+      lcd.print(temp, 1);
+      lcd.print("C");
+      lcd.setCursor(0, 1); 
+      lcd.print("H:");
+      lcd.print(hum, 1);
+      lcd.print("%");
     }
   }
 
-  delay(40);
+  // === Comunicação com o Thinger ===
+  thing.handle();
+  delay(50);
 }
 
 {
@@ -114,7 +157,7 @@ void loop() {
   "editor": "wokwi",
   "parts": [
     { "type": "wokwi-breadboard", "id": "bb1", "top": 0, "left": -200, "attrs": {} },
-    { "type": "wokwi-arduino-uno", "id": "uno", "top": 220, "left": -160, "attrs": {} },
+    { "type": "board-esp32-devkit-c-v4", "id": "esp32", "top": 200, "left": -160, "attrs": {} },
     { "type": "wokwi-buzzer", "id": "bz1", "top": 240, "left": 120, "attrs": { "volume": "0.1" } },
     { "type": "wokwi-dht22", "id": "dht1", "top": -140, "left": 180, "attrs": {} },
     {
@@ -127,10 +170,10 @@ void loop() {
     {
       "type": "wokwi-resistor",
       "id": "r1",
-      "top": 40,
-      "left": -60,
-      "rotate": 180,
-      "attrs": { "value": "180" }
+      "top": -60,
+      "left": 300,
+      "rotate": 90,
+      "attrs": { "value": "220" }
     },
     { "type": "wokwi-led", "id": "led1", "top": -60, "left": 240, "attrs": { "color": "green" } },
     {
@@ -142,23 +185,34 @@ void loop() {
     }
   ],
   "connections": [
-    [ "uno:9", "bz1:1", "purple", [ "v144", "h-172.8" ] ],
-    [ "bz1:2", "bb1:bn.19", "black", [ "v0" ] ],
-    [ "dht1:VCC", "uno:5V", "red", [ "v0" ] ],
-    [ "dht1:SDA", "uno:2", "green", [ "v0" ] ],
-    [ "dht1:GND", "uno:GND.2", "black", [ "v0" ] ],
-    [ "uno:11", "btn1:1.r", "green", [ "v-240", "h48.6" ] ],
-    [ "btn1:2.r", "bb1:bn.23", "black", [ "h0" ] ],
-    [ "uno:10", "led1:A", "green", [ "v-60", "h160" ] ],
-    [ "led1:C", "r1:1", "black", [ "v0" ] ],
-    [ "r1:2", "uno:GND.2", "black", [ "v0" ] ],
-    [ "lcd1:GND", "uno:GND.1", "black", [ "v0" ] ],
-    [ "lcd1:VCC", "uno:5V", "red", [ "v0" ] ],
-    [ "lcd1:SDA", "uno:A4", "green", [ "v0" ] ],
-    [ "lcd1:SCL", "uno:A5", "blue", [ "v0" ] ],
-    [ "btn1:1.r", "bb1:26t.c", "", [ "$bb" ] ],
-    [ "btn1:2.r", "bb1:26t.e", "", [ "$bb" ] ]
+    [ "esp32:27", "bz1:1", "purple", [ "v96", "h-115.2" ] ],
+    [ "bz1:2", "esp32:GND.2", "black", [ "v0" ] ],
+
+    [ "dht1:VCC", "esp32:3V3", "red", [ "v0" ] ],
+    [ "dht1:SDA", "esp32:15", "green", [ "v0" ] ],
+    [ "dht1:GND", "esp32:GND.1", "black", [ "v0" ] ],
+
+    [ "btn1:1.r", "esp32:14", "green", [ "v-220", "h60" ] ],
+    [ "btn1:2.r", "esp32:GND.1", "black", [ "v0" ] ],
+
+    [ "led1:A", "r1:1", "green", [ "v0" ] ],
+    [ "r1:2", "esp32:26", "green", [ "v0" ] ],
+    [ "led1:C", "esp32:GND.2", "black", [ "v0" ] ],
+
+    [ "lcd1:GND", "esp32:GND.1", "black", [ "v0" ] ],
+    [ "lcd1:VCC", "esp32:3V3", "red", [ "v0" ] ],
+    [ "lcd1:SDA", "esp32:21", "green", [ "v0" ] ],
+    [ "lcd1:SCL", "esp32:22", "blue", [ "v0" ] ]
   ],
   "dependencies": {}
 }
+
+# Wokwi Library List
+# See https://docs.wokwi.com/guides/libraries
+
+# Automatically added based on includes:
+LiquidCrystal I2C
+
+thinger.io
+DHT sensor library for ESPx
 
